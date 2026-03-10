@@ -21,6 +21,8 @@
 
 **XPack** is the world’s first open-source MCP marketplace, to quickly create and sell your own MCP services in just minutes.
 
+> This repository is a hard fork of the upstream XPack project for POSCO delivery. The upstream product identity and core capability description are intentionally preserved below, while POSCO-specific operational and product changes are summarized first so downstream operators can see what changed without losing upstream context.
+
 <br>
 
 ✨ With XPack, you can:
@@ -61,6 +63,7 @@ curl -sSO https://xpack.ai/install/quick-start.sh; bash quick-start.sh
 
 This fork has been prepared for POSCO delivery and includes several operational updates beyond the upstream project:
 
+- The upstream README structure is intentionally retained, with this fork-specific section added near the top to separate inherited capabilities from local changes.
 - Default product branding and metadata are set to **POSCO Forged AI**.
 - Local infrastructure helpers were added for MySQL, Redis, and RabbitMQ via `scripts/docker-compose.local.yml`, `scripts/dev-up.sh`, and `scripts/dev-down.sh`.
 - Production environment templates are available in `.env.production.example` and `frontend/.env.production.example`.
@@ -68,6 +71,7 @@ This fork has been prepared for POSCO delivery and includes several operational 
 - A Flowise-specific MCP publishing path was added so teams can register Flowise chatflows as MCP services alongside the existing OpenAPI-based path.
 - Marketplace navigation now shows the signed-in user and permission-based service links.
 - Database migrations include branding defaults (`version-1.3.1.sql`) and the `user_apikey.is_deleted` compatibility fix (`version-1.3.2.sql`).
+- Authentication was hardened so deleted or inactive users can no longer receive fresh login tokens and then fail on the follow-up session check.
 
 <br>
 

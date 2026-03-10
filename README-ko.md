@@ -21,6 +21,8 @@
 
 **XPack** 는 세계 최초의 오픈 소스 MCP 마켓플레이스입니다. 몇 분 만에 나만의 MCP 서비스를 만들고 판매하세요.
 
+> 이 저장소는 업스트림 XPack 프로젝트를 POSCO 납품 용도로 하드포크한 버전입니다. 업스트림 제품 설명과 기본 README 구조는 유지하되, 실제 운영자가 변경 범위를 바로 파악할 수 있도록 POSCO 전용 수정 사항을 문서 상단에서 먼저 정리합니다.
+
 <br>
 
 ✨ XPack으로 할 수 있는 일
@@ -58,6 +60,7 @@ curl -sSO https://xpack.ai/install/quick-start.sh; bash quick-start.sh
 
 이 포크는 POSCO 납품 기준으로 정리되어 있으며, 업스트림 대비 다음 항목이 추가 또는 조정되었습니다.
 
+- 업스트림 README 구조는 유지하고, 이 포크에서 변경한 운영/제품 차이만 문서 상단에 별도 구역으로 정리했습니다.
 - 기본 제품명과 메타데이터를 **POSCO Forged AI** 기준으로 변경했습니다.
 - 로컬 인프라 기동용 `scripts/docker-compose.local.yml`, `scripts/dev-up.sh`, `scripts/dev-down.sh`를 추가했습니다.
 - 운영 배포용 환경 변수 템플릿을 `.env.production.example`, `frontend/.env.production.example`에 정리했습니다.
@@ -65,6 +68,7 @@ curl -sSO https://xpack.ai/install/quick-start.sh; bash quick-start.sh
 - 기존 `MCP (OpenAPI)`와 별도로 Flowise 챗플로우를 MCP 서비스로 발행하는 `MCP (Flowise)` 경로를 추가했습니다.
 - 마켓플레이스 상단 내비게이션에 현재 로그인 사용자와 권한 기반 서비스 링크를 표시하도록 개선했습니다.
 - 데이터베이스 마이그레이션에 브랜딩 기본값(`version-1.3.1.sql`)과 `user_apikey.is_deleted` 호환 수정(`version-1.3.2.sql`)을 반영했습니다.
+- 삭제되었거나 비활성화된 사용자가 로그인 토큰만 발급받고 이후 세션 검증에서 실패하는 문제가 없도록 인증 흐름을 보강했습니다.
 
 <br>
 

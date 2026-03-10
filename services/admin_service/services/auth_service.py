@@ -59,6 +59,17 @@ class AuthService:
         fail_key = RedisKeys.login_fail_count_key(ip,user)          
         redis_client.delete(fail_key)
 
+    def _is_login_allowed(self, user) -> bool:
+        if not user:
+            return False
+        if getattr(user, "is_deleted", 0):
+            logger.warning(f"Login rejected for deleted user: {getattr(user, 'email', getattr(user, 'name', 'unknown'))}")
+            return False
+        if not getattr(user, "is_active", 0):
+            logger.warning(f"Login rejected for inactive user: {getattr(user, 'email', getattr(user, 'name', 'unknown'))}")
+            return False
+        return True
+
     def send_email_login_captcha(self, email: str) -> bool:
         """
         Sends a login captcha code to the specified email address with simple rate limiting.
@@ -106,6 +117,8 @@ class AuthService:
             if user is None:
                 group_id = self.sys_config_service.get_value_by_key(KEY_DEFAULT_RESOURCE_GROUP)
                 user = self.user_repository.create(email=email, register_type="email", role_id=2, group_id=group_id)
+            elif not self._is_login_allowed(user):
+                return None
             if user is None:
                 logger.warning(f"Failed to register user with email: {email}")
                 return None
@@ -125,6 +138,8 @@ class AuthService:
         if user is None:
             group_id = self.sys_config_service.get_value_by_key(KEY_DEFAULT_RESOURCE_GROUP)
             user = self.user_repository.create(email=email, register_type="email", role_id=2, group_id=group_id, password=password)
+        elif not self._is_login_allowed(user):
+            return None
 
         if user is None:
             logger.warning(f"Failed to register user with email: {email}")
@@ -166,6 +181,8 @@ class AuthService:
         user = self.user_repository.get_by_account(account)
         if user is None:
             logger.warning(f"not found user, account: {account}")
+            return None
+        if not self._is_login_allowed(user):
             return None
         if user.password != password:
             logger.warning(f"password not match, account: {account}, password: {password}, user password: {user.password}")
@@ -256,6 +273,8 @@ class AuthService:
             # Create user if doesn't exist
             if user is None:
                 user = self.user_repository.create_google_user(email=email, name=name or email.split("@")[0], google_id=google_id)
+            elif not self._is_login_allowed(user):
+                return None
 
             if user is None:
                 logger.error(f"Failed to create/get user with email: {email}")
