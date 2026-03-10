@@ -8,23 +8,26 @@ import { withComponentInjection } from "@/shared/hooks/useComponentInjection";
 
 interface ServiceFiltersBarProps {
   onAddService: (type: string) => void;
+  serviceType?: string;
 }
 
 const BaseServiceFiltersBar: React.FC<ServiceFiltersBarProps> = ({
   onAddService,
+  serviceType = "openapi",
 }) => {
   const { t } = useTranslation();
+  const isFlowise = serviceType === "flowise";
 
   return (
     <div className="flex flex-col sm:flex-row gap-4">
       <div className="flex-1">
         <Button
           color="primary"
-          onPress={() => onAddService("openapi")}
+          onPress={() => onAddService(serviceType)}
           startContent={<Plus size={16} />}
           size="sm"
         >
-          {t("Add Server")}
+          {isFlowise ? t("Add Flowise") : t("Add Server")}
         </Button>
       </div>
 

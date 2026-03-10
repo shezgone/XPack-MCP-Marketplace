@@ -9,13 +9,22 @@ import {
   NavbarMenu,
   NavbarMenuItem,
   Button,
+  Avatar,
+  Dropdown,
+  DropdownItem,
+  DropdownMenu,
+  DropdownTrigger,
+  Spinner,
 } from "@nextui-org/react";
 import { useTranslation } from "@/shared/lib/useTranslation";
 import { useAuth } from "@/shared/lib/useAuth";
-import { ArrowRightIcon } from "lucide-react";
+import { ArrowRightIcon, ShieldCheck, UserRound } from "lucide-react";
 import { DynamicLogo } from "@/shared/components/DynamicLogo";
 import Link from "next/link";
 import { useSharedStore } from "../store/share";
+import { useGlobalStore } from "../store/global";
+import { fetchServices } from "@/services/marketplaceService";
+import { ServiceData } from "@/shared/types/marketplace";
 export type NavigationItem = {
   label: string;
   href: string;
@@ -44,14 +53,97 @@ function NavigationClient({
 }: NavigationProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { t } = useTranslation();
-  const { handleLogin } = useAuth();
+  const { handleLogin, handleLogout } = useAuth();
+  const getUser = useGlobalStore((state) => state.getUser);
+  const [userToken, user] = useSharedStore((state) => [
+    state.user_token,
+    state.user,
+  ]);
+  const [accessibleServices, setAccessibleServices] = useState<ServiceData[]>([]);
+  const [isAccessMenuLoading, setIsAccessMenuLoading] = useState(false);
 
-  const [userToken, setUserToken] = useState<string | null>(null);
+  const displayName = user?.nick_name || user?.user_name || user?.user_email;
+  const permissionSummary = user?.allow_all
+    ? t("All published services")
+    : t("{{count}} services", { count: accessibleServices.length });
 
   useEffect(() => {
-    const userToken = useSharedStore?.getState?.().user_token
-    setUserToken(userToken);
-  }, []);
+    if (userToken && !user) {
+      getUser();
+    }
+  }, [getUser, user, userToken]);
+
+  useEffect(() => {
+    const loadAccessibleServices = async () => {
+      if (!userToken || !user) {
+        setAccessibleServices([]);
+        return;
+      }
+
+      setIsAccessMenuLoading(true);
+      try {
+        const response = await fetchServices({ page: 1, page_size: 200 });
+        const services = response.data?.services || [];
+
+        const filteredServices = user.allow_all
+          ? services
+          : services.filter((service) =>
+              user.service_ids?.includes(service.service_id || service.id)
+            );
+
+        setAccessibleServices(filteredServices);
+      } catch (error) {
+        console.error("Failed to load accessible services:", error);
+        setAccessibleServices([]);
+      } finally {
+        setIsAccessMenuLoading(false);
+      }
+    };
+
+    loadAccessibleServices();
+  }, [user, userToken]);
+
+  const handleNavigateToDashboard = () => {
+    window.location.href = "/console";
+  };
+
+  const handleNavigateToService = (serviceId?: string) => {
+    if (!serviceId) {
+      return;
+    }
+    window.location.href = `/server/${serviceId}`;
+  };
+
+  const handleUserLogout = () => {
+    handleLogout();
+    window.location.href = "/";
+  };
+
+  const accessMenuItems = isAccessMenuLoading
+    ? [
+        <DropdownItem key="loading" isReadOnly textValue="loading">
+          <div className="flex items-center gap-2">
+            <Spinner size="sm" />
+            <span>{t("Loading accessible services")}</span>
+          </div>
+        </DropdownItem>,
+      ]
+    : accessibleServices.length > 0
+      ? accessibleServices.slice(0, 10).map((service) => (
+          <DropdownItem
+            key={service.service_id || service.id}
+            onPress={() =>
+              handleNavigateToService(service.service_id || service.id)
+            }
+          >
+            {service.name}
+          </DropdownItem>
+        ))
+      : [
+          <DropdownItem key="no-access" isReadOnly textValue="no-access">
+            {t("No accessible services")}
+          </DropdownItem>,
+        ];
 
   return (
     <>
@@ -106,17 +198,71 @@ function NavigationClient({
             langNode
           ) : (
             <>
-              {
-                !userToken && (
-                  <>
+              {!userToken && (
+                <>
                   <Button onPress={handleLogin} variant="light">
                     <b className="text-md"> {t("Sign In")}</b>
                   </Button>
-                  </>
-                )
-              }
+                </>
+              )}
             </>
           )}
+
+          {userToken && user ? (
+            <Dropdown placement="bottom-end">
+              <DropdownTrigger>
+                <Button
+                  variant="light"
+                  className="hidden md:flex items-center gap-3 px-3 h-[45px]"
+                >
+                  <Avatar
+                    isBordered
+                    size="sm"
+                    src={user.avatar || ""}
+                    name={displayName || "User"}
+                  />
+                  <div className="flex flex-col items-start leading-tight">
+                    <span className="text-xs text-default-500">{t("Signed in")}</span>
+                    <span className="max-w-[180px] truncate font-medium text-sm">
+                      {displayName}
+                    </span>
+                  </div>
+                </Button>
+              </DropdownTrigger>
+              <DropdownMenu aria-label="User access menu">
+                <DropdownItem
+                  key="current-user"
+                  isReadOnly
+                  startContent={<UserRound size={16} />}
+                  className="opacity-100"
+                  textValue={displayName || "User"}
+                >
+                  <div className="flex flex-col">
+                    <span className="font-medium">{displayName}</span>
+                    <span className="text-xs text-default-500">
+                      {user.user_email}
+                    </span>
+                  </div>
+                </DropdownItem>
+                <DropdownItem
+                  key="permission-summary"
+                  isReadOnly
+                  startContent={<ShieldCheck size={16} />}
+                  className="opacity-100"
+                  textValue={permissionSummary}
+                >
+                  {permissionSummary}
+                </DropdownItem>
+                <DropdownItem key="dashboard" onPress={handleNavigateToDashboard}>
+                  {t("Dashboard")}
+                </DropdownItem>
+                <>{accessMenuItems}</>
+                <DropdownItem key="logout" color="danger" onPress={handleUserLogout}>
+                  {t("Log Out")}
+                </DropdownItem>
+              </DropdownMenu>
+            </Dropdown>
+          ) : null}
 
           {/* Desktop Auth Button */}
           <div className="hidden sm:block">
@@ -152,6 +298,22 @@ function NavigationClient({
 
         {/* Mobile Menu */}
         <NavbarMenu className="pt-6 pb-6">
+          {userToken && user ? (
+            <NavbarMenuItem className="pb-2 border-b border-divider mb-2">
+              <div className="flex items-center gap-3 py-2">
+                <Avatar
+                  isBordered
+                  size="sm"
+                  src={user.avatar || ""}
+                  name={displayName || "User"}
+                />
+                <div>
+                  <p className="text-sm font-medium">{displayName}</p>
+                  <p className="text-xs text-default-500">{permissionSummary}</p>
+                </div>
+              </div>
+            </NavbarMenuItem>
+          ) : null}
           {items?.map((item, index) => (
             <NavbarMenuItem key={`${item.href}-${index}`}>
               <Link
@@ -162,6 +324,18 @@ function NavigationClient({
                 prefetch={!item.target}
               >
                 {t(item.label)}
+              </Link>
+            </NavbarMenuItem>
+          ))}
+          {userToken && accessibleServices.slice(0, 5).map((service) => (
+            <NavbarMenuItem key={`service-${service.service_id || service.id}`}>
+              <Link
+                color="foreground"
+                href={`/server/${service.service_id || service.id}`}
+                className="w-full py-2 font-medium text-sm"
+                prefetch
+              >
+                {service.name}
               </Link>
             </NavbarMenuItem>
           ))}

@@ -1,0 +1,67 @@
+services:
+  xpack-mysql:
+    image: mysql:8.0.37
+    restart: unless-stopped
+    container_name: xpack-mysql-local
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    ports:
+      - "33306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: mysql_ZTdhRB
+      MYSQL_DATABASE: xpack
+    volumes:
+      - xpack_mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-pmysql_ZTdhRB"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  xpack-redis:
+    image: redis:7.2.4
+    restart: unless-stopped
+    container_name: xpack-redis-local
+    ports:
+      - "6379:6379"
+    command:
+      - redis-server
+      - --protected-mode
+      - yes
+      - --appendonly
+      - no
+      - --port
+      - "6379"
+      - --requirepass
+      - redis_6sJZDm
+    volumes:
+      - xpack_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "redis_6sJZDm", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  xpack-rabbitmq:
+    image: rabbitmq:4.1.2-management-alpine
+    restart: unless-stopped
+    container_name: xpack-rabbitmq-local
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: rabbitmq
+      RABBITMQ_DEFAULT_PASS: rabbitmq_Gs123dA
+    volumes:
+      - xpack_rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+volumes:
+  xpack_mysql_data:
+  xpack_redis_data:
+  xpack_rabbitmq_data:

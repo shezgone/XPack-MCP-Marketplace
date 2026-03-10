@@ -8,6 +8,9 @@ interface FooterProps {}
 
 export const Footer: React.FC<FooterProps> = ({}) => {
   const { platformConfig } = usePlatformConfig();
+  const platformUrl =
+    platformConfig?.url ||
+    (platformConfig?.domain ? `https://${platformConfig.domain}` : undefined);
   return (
     <>
       {/* Modern Footer */}
@@ -19,14 +22,20 @@ export const Footer: React.FC<FooterProps> = ({}) => {
                 © 2025 {platformConfig?.name}. All rights reserved.
               </span>
 
-              <a
-                href="https://xpack.ai"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 text-primary-400 text-xs"
-              >
-                <span>Powered By XPack.AI</span>
-              </a>
+              {platformUrl ? (
+                <a
+                  href={platformUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 text-primary-400 text-xs"
+                >
+                  <span>Powered by {platformConfig?.name}</span>
+                </a>
+              ) : (
+                <span className="inline-flex items-center gap-2 text-primary-400 text-xs">
+                  Powered by {platformConfig?.name}
+                </span>
+              )}
             </div>
           </div>
         </div>

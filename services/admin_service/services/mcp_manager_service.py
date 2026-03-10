@@ -93,6 +93,18 @@ class McpManagerService:
         except Exception as e:
             logger.warning(f"Failed to delete service price cache - Service ID: {service_id}: {str(e)}")
 
+    def _generate_unique_slug_name(self, name: str) -> str:
+        base_slug = normalize_slug_name(name)
+        slug_name = base_slug
+        counter = 1
+
+        while True:
+            existing_service = self.mcp_service_repository.get_by_slug_name(slug_name)
+            if not existing_service:
+                return slug_name
+            slug_name = f"{base_slug}-{counter}"
+            counter += 1
+
 
     def update_enabled(self, id: str, enabled: int) -> McpService:
         return self.mcp_service_repository.update_enabled(id, enabled)
@@ -235,6 +247,8 @@ class McpManagerService:
             else:
                 # If provided as string, store directly
                 existing_service.tags = body["tags"]
+        if "service_type" in body and body["service_type"] is not None:
+            existing_service.service_type = body["service_type"]
         if not existing_service.service_type:
             existing_service.service_type = "openapi"
         # Commit changes
@@ -311,23 +325,89 @@ class McpManagerService:
             "long_description": service.long_description,
             "base_url": service.base_url,
             "headers":json.loads(service.headers) if service.headers else [],
+            "service_type": service.service_type,
             "charge_type": service.charge_type.value if service.charge_type else None,
             "price": str(float(service.price)) if service.price and service.charge_type == ChargeType.PER_CALL else "0.00",
             "input_token_price": str(float(service.input_token_price)) if service.input_token_price and service.charge_type == ChargeType.PER_TOKEN else "0.00",
             "output_token_price": str(float(service.output_token_price)) if service.output_token_price and service.charge_type == ChargeType.PER_TOKEN else "0.00",
             "enabled": service.enabled,
             "tags": parse_tags_to_array(service.tags),
-            "apis": [{"id": api.id, "name": api.name, "description": api.description,"url":api.path} for api in apis],
+            "apis": [{"id": api.id, "name": api.name, "description": api.description,"url":api.path, "path": api.path} for api in apis],
         }
 
         return service_info
 
-    def get_all(self) -> List[McpService]:
-        return self.mcp_service_repository.get_all()
+    def get_all(self, service_type: Optional[str] = None) -> List[McpService]:
+        return self.mcp_service_repository.get_all(service_type=service_type)
 
-    def get_all_paginated(self, page: int = 1, page_size: int = 10,keyword: Optional[str] = None,filter_status: Optional[list] = None) -> Tuple[List[McpService], int]:
+    def get_all_paginated(self, page: int = 1, page_size: int = 10,keyword: Optional[str] = None,filter_status: Optional[list] = None, service_type: Optional[str] = None) -> Tuple[List[McpService], int]:
         """Get service list with pagination"""
-        return self.mcp_service_repository.get_all_paginated(page=page, page_size=page_size,keyword=keyword,filter_status=filter_status)
+        return self.mcp_service_repository.get_all_paginated(page=page, page_size=page_size,keyword=keyword,filter_status=filter_status, service_type=service_type)
+
+    def create_flowise_service(self, body: dict) -> str:
+        try:
+            service_id = str(uuid.uuid4())
+            name = body.get("name") or "Flowise Chatflow"
+            slug_name = body.get("slug_name") or self._generate_unique_slug_name(name)
+            short_description = body.get("short_description") or name
+            long_description = body.get("long_description")
+            base_url = body.get("base_url")
+            chatflow_id = body.get("flowise_chatflow_id")
+            headers = body.get("headers") or []
+            charge_type = body.get("charge_type") or ChargeType.FREE.value
+            price = body.get("price") or 0.0
+            input_token_price = body.get("input_token_price") or 0.0
+            output_token_price = body.get("output_token_price") or 0.0
+            enabled = body.get("enabled", 0)
+            tags = parse_tags_to_string(body.get("tags"))
+
+            mcp_service = McpService()
+            mcp_service.id = service_id
+            mcp_service.name = name
+            mcp_service.slug_name = slug_name
+            mcp_service.short_description = short_description
+            mcp_service.long_description = long_description
+            mcp_service.base_url = base_url
+            mcp_service.headers = json.dumps(headers)
+            mcp_service.charge_type = ChargeType(charge_type)
+            mcp_service.price = price
+            mcp_service.input_token_price = input_token_price
+            mcp_service.output_token_price = output_token_price
+            mcp_service.enabled = enabled
+            mcp_service.tags = tags
+            mcp_service.service_type = "flowise"
+            self.mcp_service_repository.create(mcp_service)
+
+            tool_api = McpToolApi()
+            tool_api.id = str(uuid.uuid4())
+            tool_api.service_id = service_id
+            tool_api.name = "predict"
+            tool_api.description = "Run the configured Flowise chatflow"
+            tool_api.path = f"/api/v1/prediction/{chatflow_id}"
+            tool_api.method = HttpMethod.POST
+            tool_api.header_parameters = ""
+            tool_api.query_parameters = ""
+            tool_api.path_parameters = ""
+            tool_api.request_body_schema = json.dumps({
+                "type": "object",
+                "properties": {
+                    "question": {"type": "string", "description": "User input for the Flowise chatflow"},
+                    "overrideConfig": {"type": "object", "description": "Optional Flowise override config"}
+                },
+                "required": ["question"]
+            })
+            tool_api.response_schema = json.dumps({"type": "object"})
+            tool_api.response_examples = json.dumps({"text": "Flowise response"})
+            tool_api.response_headers = ""
+            tool_api.operation_examples = ""
+            tool_api.enabled = 1
+            tool_api.is_deleted = 0
+            self.mcp_tool_api_repository.create(tool_api)
+
+            return service_id
+        except Exception as e:
+            logger.error(f"Failed to create Flowise service: {str(e)}")
+            raise ValueError(f"Failed to create Flowise service: {str(e)}")
 
     def get_tags_list(self, enabled_only: bool = False) -> List[str]:
         tags_strings = self.mcp_service_repository.get_tags_strings(enabled_only=enabled_only)
@@ -366,24 +446,7 @@ class McpManagerService:
             mcp_service.name = openapi_data.title
 
             # Generate unique slug_name
-            base_slug = normalize_slug_name(openapi_data.title)
-            slug_name = base_slug
-            counter = 1
-
-            while True:
-                # Check if slug_name already exists
-                try:
-                    existing_service = self.mcp_service_repository.get_by_slug_name(slug_name)
-                    if not existing_service:
-                        break
-                except AttributeError:
-                    # If method doesn't exist, directly break and use current slug_name
-                    break
-                # If exists, append number
-                slug_name = f"{base_slug}-{counter}"
-                counter += 1
-
-            mcp_service.slug_name = slug_name
+            mcp_service.slug_name = self._generate_unique_slug_name(openapi_data.title)
             mcp_service.short_description = openapi_data.description[:255] if openapi_data.description else openapi_data.title
             mcp_service.long_description = openapi_data.description
             mcp_service.base_url = ""  # Requires user configuration later

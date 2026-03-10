@@ -54,6 +54,90 @@ curl -sSO https://xpack.ai/install/quick-start.sh; bash quick-start.sh
 
 <br>
 
+## POSCO 포크 반영 사항
+
+이 포크는 POSCO 납품 기준으로 정리되어 있으며, 업스트림 대비 다음 항목이 추가 또는 조정되었습니다.
+
+- 기본 제품명과 메타데이터를 **POSCO Forged AI** 기준으로 변경했습니다.
+- 로컬 인프라 기동용 `scripts/docker-compose.local.yml`, `scripts/dev-up.sh`, `scripts/dev-down.sh`를 추가했습니다.
+- 운영 배포용 환경 변수 템플릿을 `.env.production.example`, `frontend/.env.production.example`에 정리했습니다.
+- 운영 전 점검용 문서를 `docs/production-deployment-checklist.md`에 추가했습니다.
+- 기존 `MCP (OpenAPI)`와 별도로 Flowise 챗플로우를 MCP 서비스로 발행하는 `MCP (Flowise)` 경로를 추가했습니다.
+- 마켓플레이스 상단 내비게이션에 현재 로그인 사용자와 권한 기반 서비스 링크를 표시하도록 개선했습니다.
+- 데이터베이스 마이그레이션에 브랜딩 기본값(`version-1.3.1.sql`)과 `user_apikey.is_deleted` 호환 수정(`version-1.3.2.sql`)을 반영했습니다.
+
+<br>
+
+## 로컬 개발 실행
+
+현재 이 포크의 로컬 실행 구성은 다음과 같습니다.
+
+- 프런트엔드: `http://127.0.0.1:3001`
+- 관리자 백엔드: `http://127.0.0.1:8001`
+- 공개 API / MCP 백엔드: `http://127.0.0.1:8002`
+- Flowise 예시: `http://127.0.0.1:3000`
+
+### 1. 로컬 인프라 시작
+
+```bash
+./scripts/dev-up.sh
+```
+
+시작되는 구성은 다음과 같습니다.
+
+- MySQL: `127.0.0.1:33306`
+- Redis: `127.0.0.1:6379`
+- RabbitMQ: `127.0.0.1:5672`
+- RabbitMQ UI: `http://127.0.0.1:15672`
+
+### 2. Python 가상환경 및 DB 초기화
+
+```bash
+uv venv
+source .venv/bin/activate
+uv pip install -r requirements.txt
+cp .env.example .env
+python scripts/resource/init_db.py
+```
+
+### 3. 백엔드 실행
+
+```bash
+uvicorn services.admin_service.main:app --host 0.0.0.0 --port 8001 --reload
+uvicorn services.api_service.main:app --host 0.0.0.0 --port 8002 --reload
+```
+
+### 4. 프런트엔드 실행
+
+```bash
+cd frontend
+pnpm install
+pnpm dev --port 3001
+```
+
+### 5. 기본 관리자 접속 정보
+
+- 관리자 로그인: `http://127.0.0.1:3001/admin`
+- 계정: `admin`
+- 비밀번호: `123456789`
+
+<br>
+
+## Flowise MCP 연동
+
+이 포크는 두 가지 MCP 발행 방식을 지원합니다.
+
+- `MCP (OpenAPI)`: 기존 OpenAPI 기반 MCP 생성
+- `MCP (Flowise)`: Flowise chatflow를 `predict` 도구를 가진 MCP 서비스로 발행
+
+Flowise 연동 시 주의할 점은 다음과 같습니다.
+
+- 발행된 서비스는 SSE와 Streamable HTTP MCP 엔드포인트를 모두 제공합니다.
+- Flowise가 Docker에서 실행 중이면 로컬 MCP 주소에 `127.0.0.1` 대신 `host.docker.internal`을 사용해야 합니다.
+- Flowise `Custom MCP` 설정은 `{ "url": "http://host.docker.internal:8002/mcp/<service-id>/streamable-http?authkey=..." }` 형태의 단일 서버 설정을 사용합니다.
+
+<br>
+
 ## 🖥️ 시스템 요구 사항
 
 ### ✅ 권장 하드웨어
@@ -183,7 +267,7 @@ curl -sSO https://xpack.ai/install/quick-start.sh; bash quick-start.sh
   <br>
 
   4. 브라우저에서 8000 포트로 접속
-  * **관리자 로그인 주소**: http://{IP}:8000/admin-signin  
+  * **관리자 로그인 주소**: http://{IP}:8000/admin  
   * **관리자 계정**: admin  
   * **관리자 비밀번호**: 123456789
 </details>

@@ -1,0 +1,12 @@
+- Runtime requirements: Python >= 3.11 from pyproject.toml.
+- Backend dependencies are listed in requirements.txt.
+- Core infrastructure services: MySQL, Redis, RabbitMQ.
+- Sample app env is in .env.example.
+- Container startup reference is scripts/docker-compose.yml.
+- Quick-start logic is in scripts/quick-start.sh.
+- Default local ports from repo: MySQL 33306, Redis 6379, app 8000.
+- Local dev launcher files: scripts/dev-up.sh and scripts/dev-down.sh.
+- Current default branding baseline: POSCO Forged AI.
+- Branding DB migration added in scripts/resource/sql/version-1.3.1.sql.
+- Production env templates: .env.production.example and frontend/.env.production.example.
+- Deployment checklist: docs/production-deployment-checklist.md.

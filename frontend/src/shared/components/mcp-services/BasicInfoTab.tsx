@@ -14,6 +14,7 @@ interface BasicInfoTabProps {
   onAddTag: () => void;
   onRemoveTag: (tag: string) => void;
   errors?: Record<string, string>;
+  serviceType?: string;
 }
 
 export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
@@ -24,8 +25,10 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
   onAddTag,
   onRemoveTag,
   errors,
+  serviceType = "openapi",
 }) => {
   const { t } = useTranslation();
+  const isFlowise = serviceType === "flowise";
 
   return (
     <div className="flex flex-col gap-4">
@@ -72,8 +75,10 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
       />
 
       <Input
-        label={t("API Endpoint")}
-        placeholder="https://api.example.com/v1"
+        label={isFlowise ? t("Flowise Base URL") : t("API Endpoint")}
+        placeholder={
+          isFlowise ? "http://127.0.0.1:3000" : "https://api.example.com/v1"
+        }
         value={formData.base_url || ""}
         onChange={(e) => onInputChange("base_url", e.target.value)}
         isRequired
@@ -81,6 +86,20 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
         isInvalid={!!errors?.base_url}
         errorMessage={errors?.base_url || t("API Endpoint is required")}
       />
+      {isFlowise && (
+        <Input
+          label={t("Chatflow ID")}
+          placeholder={t("Enter Flowise chatflow ID")}
+          value={formData.flowise_chatflow_id || ""}
+          onChange={(e) => onInputChange("flowise_chatflow_id", e.target.value)}
+          isRequired
+          labelPlacement="outside"
+          isInvalid={!!errors?.flowise_chatflow_id}
+          errorMessage={
+            errors?.flowise_chatflow_id || t("Chatflow ID is required")
+          }
+        />
+      )}
       {/* headers input fields */}
       <HeadersManagementSettings
         formData={formData}

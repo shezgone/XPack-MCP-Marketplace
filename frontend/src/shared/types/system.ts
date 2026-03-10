@@ -14,6 +14,7 @@ export enum EmailMode {
 export interface PlatformConfig {
   logo?: string; // platform logo url
   name: string; // platform name
+  url?: string; // platform public URL
   currency?: string; // currency unit, e.g. 'USD', 'CNY', 'EUR'
   language?: string; // platform language, default 'en'
   website_title?: string; // website title
@@ -22,6 +23,7 @@ export interface PlatformConfig {
   theme?: Theme; // platform theme for homepage and marketplace templates
   about_page?: string; // about page content (markdown)
   domain?: string; // platform domain
+  subdomain?: string; // platform subdomain prefix
   is_showcased?: boolean; // whether to showcase in xpack official case list
   mcp_server_prefix?: string; // MCP server domain prefix for API calls
   x_title?: string; // x title

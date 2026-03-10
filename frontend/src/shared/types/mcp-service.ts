@@ -43,6 +43,7 @@ export interface MCPService extends BaseMCPService {
   source_type?: SourceType; // manual or imported
   headers?: MCPAuthHeaderItem[]; // headers to be sent with the request
   service_type?: string; // server type: openapi, webscraper, etc.
+  flowise_chatflow_id?: string;
   [key: string]: any;
 }
 
@@ -51,6 +52,7 @@ export interface MCPServiceAPIItem {
   name: string;
   description?: string;
   url?: string;
+  path?: string;
 }
 
 // form data interface, used to create and edit service
@@ -75,7 +77,25 @@ export interface MCPServiceFormData {
   update_type?: string; // 用于标识更新类型，如 "openapi"
   source_type?: SourceType; // manual or imported
   server_config?: string; // server config in JSON format
+  service_type?: string;
+  flowise_chatflow_id?: string;
   [key: string]: any;
+}
+
+export interface CreateFlowiseServicePayload {
+  name: string;
+  slug_name: string;
+  short_description: string;
+  long_description?: string;
+  base_url: string;
+  flowise_chatflow_id: string;
+  headers?: MCPAuthHeaderItem[];
+  charge_type: ChargeType;
+  price?: number;
+  input_token_price?: number;
+  output_token_price?: number;
+  enabled: EnabledEnum;
+  tags?: string[];
 }
 
 // OpenAPI generator data interface

@@ -28,6 +28,22 @@ class OpenApiRequest(BaseModel):
     description: Optional[str] = None
 
 
+class FlowiseServiceRequest(BaseModel):
+    name: str
+    slug_name: str
+    short_description: str
+    long_description: Optional[str] = None
+    base_url: str
+    flowise_chatflow_id: str
+    headers: Optional[list] = None
+    charge_type: Optional[str] = ChargeType.FREE.value
+    price: Optional[float] = 0
+    input_token_price: Optional[float] = 0
+    output_token_price: Optional[float] = 0
+    enabled: Optional[int] = 0
+    tags: Optional[list] = None
+
+
 def get_mcp_manager(db: Session = Depends(get_db)) -> McpManagerService:
     return McpManagerService(db)
 
@@ -100,6 +116,26 @@ def delete_mcp_service(request: Request, body: dict = Body(...), mcp_manager_ser
 
     mcp_manager_service.delete(id)
     return ResponseUtils.success()
+
+
+@router.post("/service/flowise", summary="Create Flowise MCP service")
+def create_flowise_service(request: Request, body: FlowiseServiceRequest, mcp_manager_service: McpManagerService = Depends(get_mcp_manager)):
+    if not UserUtils.is_admin(request):
+        return ResponseUtils.error(error_msg=error_msg.NO_PERMISSION)
+
+    try:
+        ValidationUtils.require_non_empty_string(body.name, "name")
+        ValidationUtils.require_non_empty_string(body.slug_name, "slug_name")
+        ValidationUtils.require_non_empty_string(body.short_description, "short_description")
+        ValidationUtils.require_non_empty_string(body.flowise_chatflow_id, "flowise_chatflow_id")
+        ValidationUtils.validate_url(body.base_url, "base_url")
+        service_id = mcp_manager_service.create_flowise_service(body.model_dump())
+        return ResponseUtils.success(data={"service_id": service_id})
+    except ValueError as e:
+        return ResponseUtils.error(message=str(e))
+    except Exception as e:
+        logger.error(f"Failed to create Flowise service: {str(e)}")
+        return ResponseUtils.error(error_msg=error_msg.INTERNAL_ERROR)
 
 
 @router.post("/openapi_parse", summary="openapi import", response_model=dict)
@@ -202,7 +238,7 @@ def get_mcp_service_info(request: Request, id: str, mcp_manager_service: McpMana
 
 @router.get("/service/list", summary="Get MCP service list")
 def get_mcp_service_list(
-    request: Request, page: int = 1, page_size: int = 10,keyword: str = "",filter_status: str = "", mcp_manager_service: McpManagerService = Depends(get_mcp_manager)
+    request: Request, page: int = 1, page_size: int = 10,keyword: str = "",filter_status: str = "", service_type: str = "", mcp_manager_service: McpManagerService = Depends(get_mcp_manager)
 ):
     """Get paginated list of all MCP services."""
     if not UserUtils.is_admin(request):
@@ -213,10 +249,10 @@ def get_mcp_service_list(
     try:
         # Fetch paginated data
         try:
-            services, total = mcp_manager_service.get_all_paginated(page=page, page_size=page_size,keyword=keyword,filter_status=status)
+            services, total = mcp_manager_service.get_all_paginated(page=page, page_size=page_size,keyword=keyword,filter_status=status, service_type=service_type or None)
         except AttributeError:
             # Fallback to non-paginated method when missing
-            all_services = mcp_manager_service.get_all()
+            all_services = mcp_manager_service.get_all(service_type=service_type or None)
             total = len(all_services)
             start = (page - 1) * page_size
             end = start + page_size
@@ -231,6 +267,7 @@ def get_mcp_service_list(
                 "short_description": service.short_description,
                 "long_description": service.long_description,
                 "base_url": service.base_url,
+                "service_type": service.service_type,
                 "charge_type": service.charge_type.value if service.charge_type else None,
                 "price": str(float(service.price)) if service.price and service.charge_type == ChargeType.PER_CALL else "0.00",
                 "input_token_price": str(float(service.input_token_price)) if service.input_token_price and service.charge_type == ChargeType.PER_TOKEN else "0.00",
@@ -249,7 +286,7 @@ def get_mcp_service_list(
 
 @router.get("/service/list/simple", summary="Get MCP service simple list")
 def get_mcp_service_simple_list(
-    request: Request, mcp_manager_service: McpManagerService = Depends(get_mcp_manager)
+    request: Request, service_type: str = "", mcp_manager_service: McpManagerService = Depends(get_mcp_manager)
 ):
     """Get paginated list of all MCP services."""
     if not UserUtils.is_admin(request):
@@ -257,13 +294,14 @@ def get_mcp_service_simple_list(
 
     try:
         # Fetch paginated data
-        services = mcp_manager_service.get_all()
+        services = mcp_manager_service.get_all(service_type=service_type or None)
         service_list = [
             {
                 "id": service.id,
                 "name": service.name,
                 "slug_name": service.slug_name,
                 "base_url": service.base_url,
+            "service_type": service.service_type,
                 "charge_type": service.charge_type.value if service.charge_type else None,
                 "price": str(float(service.price)) if service.price and service.charge_type == ChargeType.PER_CALL else "0.00",
                 "input_token_price": str(float(service.input_token_price)) if service.input_token_price and service.charge_type == ChargeType.PER_TOKEN else "0.00",

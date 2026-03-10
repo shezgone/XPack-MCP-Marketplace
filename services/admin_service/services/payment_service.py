@@ -150,7 +150,7 @@ class PaymentService:
             return None
         platform_name = self.sys_config_repository.get_by_key(KEY_PLATFORM_NAME)
         if platform_name is None:
-            platform_name = "XPack"
+            platform_name = "POSCO Forged AI"
         client = AlipayClient(app_id, app_private_key, alipay_public_key)
         response_url = client.create_trade(out_trade_no= user_wallet_history.id, total_amount=amount, subject=f"[Deposit] {platform_name}", body="Payment for service")
         return {"payment_link": response_url, "payment_id": user_wallet_history.id}
@@ -204,7 +204,7 @@ class PaymentService:
         try:
             platform_name = self.sys_config_repository.get_by_key(KEY_PLATFORM_NAME)
             if platform_name is None:
-                platform_name = "XPack"
+                platform_name = "POSCO Forged AI"
                 
             logger.info(f"Creating WeChat Pay client for mch_id: {mch_id}")
             

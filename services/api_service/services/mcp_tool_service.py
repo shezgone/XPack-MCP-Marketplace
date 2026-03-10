@@ -38,7 +38,10 @@ class McpToolService:
             # Send HTTP request
             response_text = await self._send_http_request(request_info)
             if response_text:
-                response_data = json.loads(response_text)
+                try:
+                    response_data = json.loads(response_text)
+                except json.JSONDecodeError:
+                    response_data = {"text": response_text}
             else:
                 response_data = {}
             logger.info("Tool execution completed successfully")

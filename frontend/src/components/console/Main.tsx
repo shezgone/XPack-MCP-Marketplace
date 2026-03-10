@@ -37,7 +37,7 @@ const ConsoleContent: React.FC = () => {
     const tabFromUrl = searchParams.get("tab") as TabKey;
     if (
       tabFromUrl &&
-      ["mcp-services", "user-management", "revenue-management", "resource-group"].includes(
+      ["mcp-services", "mcp-flowise", "user-management", "revenue-management", "resource-group"].includes(
         tabFromUrl
       )
     ) {
@@ -66,8 +66,14 @@ const ConsoleContent: React.FC = () => {
     {
       key: TabKey.MCP_SERVICES,
       icon: <ServerIcon size={18} />,
-      label: t("MCP"),
-      description: t("Manage MCP servers and API tools"),
+      label: t("MCP (OpenAPI)"),
+      description: t("Manage OpenAPI-based MCP services"),
+    },
+    {
+      key: TabKey.MCP_FLOWISE,
+      icon: <ServerIcon size={18} />,
+      label: t("MCP (Flowise)"),
+      description: t("Register Flowise chatflows as MCP services"),
     },
     {
       key: TabKey.USER_MANAGEMENT,
@@ -212,7 +218,9 @@ const ConsoleContent: React.FC = () => {
   const renderContent = () => {
     switch (activeTab) {
       case TabKey.MCP_SERVICES:
-        return <MCPServicesManagement />;
+        return <MCPServicesManagement serviceType="openapi" />;
+      case TabKey.MCP_FLOWISE:
+        return <MCPServicesManagement serviceType="flowise" />;
       case TabKey.USER_MANAGEMENT:
         return (
           <div className="h-full overflow-auto">

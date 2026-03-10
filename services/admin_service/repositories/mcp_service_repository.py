@@ -63,15 +63,17 @@ class McpServiceRepository:
         """Get a service by unique slug name."""
         return self.db.query(McpService).filter(McpService.slug_name == slug_name).first()
 
-    def get_all(self, keyword: Optional[str] = None) -> List[McpService]:
+    def get_all(self, keyword: Optional[str] = None, service_type: Optional[str] = None) -> List[McpService]:
         """List all services ordered by creation time descending."""
         query = self.db.query(McpService).order_by(McpService.created_at.desc())
         if keyword:
             keyword = f"%{keyword}%"
             query = query.filter((McpService.name.like(keyword)) | (McpService.short_description.like(keyword)))
+        if service_type:
+            query = query.filter(McpService.service_type == service_type)
         return query.all()
 
-    def get_all_paginated(self, page: int = 1, page_size: int = 10, keyword: Optional[str] = None,filter_status: Optional[list] = None) -> Tuple[List[McpService], int]:
+    def get_all_paginated(self, page: int = 1, page_size: int = 10, keyword: Optional[str] = None,filter_status: Optional[list] = None, service_type: Optional[str] = None) -> Tuple[List[McpService], int]:
         """Get service list with pagination"""
         offset = (page - 1) * page_size
 
@@ -81,6 +83,8 @@ class McpServiceRepository:
             query = query.filter((McpService.name.like(keyword)) | (McpService.short_description.like(keyword)))
         if filter_status:
             query = query.filter(McpService.enabled.in_(filter_status))
+        if service_type:
+            query = query.filter(McpService.service_type == service_type)
         total = query.count()
         query = query.order_by(McpService.created_at.desc()).offset(offset).limit(page_size)
         

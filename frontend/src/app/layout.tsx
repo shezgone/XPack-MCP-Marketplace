@@ -29,6 +29,12 @@ export default async function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning data-color-mode="light">
       <head>
+        <title>
+          {platformConfig?.platform?.website_title ||
+            platformConfig?.platform?.headline ||
+            platformConfig?.platform?.name ||
+            "POSCO Forged AI"}
+        </title>
         <script
           dangerouslySetInnerHTML={{
             __html: `

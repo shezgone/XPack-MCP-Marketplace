@@ -30,7 +30,7 @@ export const getDynamicTitle = async (pageTitle?: string) => {
     platformConfig.platform?.website_title ||
     platformConfig.platform?.headline ||
     platformConfig.platform?.name ||
-    "Connect Your AI Agent to the Real World - XPack";
+    "POSCO Forged AI";
   return {
     ...platformConfig.platform,
     website_title: pageTitle ? `${pageTitle} - ${websiteTitle}` : websiteTitle,
@@ -39,15 +39,24 @@ export const getDynamicTitle = async (pageTitle?: string) => {
 
 // create base metadata object
 export const createBaseMetadata = (config: PlatformConfig): Metadata => {
-  const url: string = `https://${config.domain || `${config.subdomain}${process.env.NEXT_PUBLIC_DOMAIN_HOST}`}`;
+  const url =
+    config.url ||
+    (config.domain
+      ? `https://${config.domain}`
+      : config.subdomain && process.env.NEXT_PUBLIC_DOMAIN_HOST
+        ? `https://${config.subdomain}${process.env.NEXT_PUBLIC_DOMAIN_HOST}`
+        : process.env.NEXT_PUBLIC_SITE_URL);
   return {
     title: config.website_title || config.headline,
     description:
       config?.meta_description ||
       config?.subheadline ||
-      "unified platform simplifies API access, accelerates development, and unlocks a universe of capabilities for your AI agents, chatbots, and automated workflows. ",
+      "POSCO Forged AI is a private marketplace for industrial MCP services, internal AI tools, and secure enterprise automation.",
     keywords: [
       "API integration platform",
+      "POSCO Forged AI",
+      "Industrial AI marketplace",
+      "Enterprise MCP marketplace",
       "Agent API connectivity",
       "AI agent integration",
       "Chatbot API access",
@@ -63,16 +72,16 @@ export const createBaseMetadata = (config: PlatformConfig): Metadata => {
       "Low-code API development",
       "Enterprise API connectivity",
       "Developer tools API",
-      "XPack.AI",
+      "POSCO",
     ],
-    authors: [{ name: "XPack.AI Team" }],
+    authors: [{ name: `${config?.name || "POSCO Forged AI"} Team` }],
     openGraph: {
       siteName: config?.name,
       title: config?.x_title || config?.headline,
       description:
         config?.x_description ||
         config?.subheadline ||
-        "Connect Your Agent to Any API/MCP",
+        "Private AI marketplace for industrial MCP services and internal automation.",
       type: "website",
       images: [config?.facebook_image_url || "/static/publication-cover.png"],
       url: url,
@@ -83,7 +92,7 @@ export const createBaseMetadata = (config: PlatformConfig): Metadata => {
       description:
         config?.x_description ||
         config?.subheadline ||
-        "Connect Your Agent to Any API/MCP",
+        "Private AI marketplace for industrial MCP services and internal automation.",
       images: [config?.x_image_url || "/static/publication-cover.png"],
       card: "summary_large_image",
     },

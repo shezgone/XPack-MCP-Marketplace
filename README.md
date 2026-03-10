@@ -57,6 +57,90 @@ curl -sSO https://xpack.ai/install/quick-start.sh; bash quick-start.sh
 
 <br>
 
+## POSCO Fork Notes
+
+This fork has been prepared for POSCO delivery and includes several operational updates beyond the upstream project:
+
+- Default product branding and metadata are set to **POSCO Forged AI**.
+- Local infrastructure helpers were added for MySQL, Redis, and RabbitMQ via `scripts/docker-compose.local.yml`, `scripts/dev-up.sh`, and `scripts/dev-down.sh`.
+- Production environment templates are available in `.env.production.example` and `frontend/.env.production.example`.
+- A production rollout checklist is available at `docs/production-deployment-checklist.md`.
+- A Flowise-specific MCP publishing path was added so teams can register Flowise chatflows as MCP services alongside the existing OpenAPI-based path.
+- Marketplace navigation now shows the signed-in user and permission-based service links.
+- Database migrations include branding defaults (`version-1.3.1.sql`) and the `user_apikey.is_deleted` compatibility fix (`version-1.3.2.sql`).
+
+<br>
+
+## Local Development
+
+This repository is currently wired for a split local runtime:
+
+- Frontend: `http://127.0.0.1:3001`
+- Admin backend: `http://127.0.0.1:8001`
+- Public API / MCP backend: `http://127.0.0.1:8002`
+- Local Flowise example: `http://127.0.0.1:3000`
+
+### 1. Start local infrastructure
+
+```bash
+./scripts/dev-up.sh
+```
+
+This starts:
+
+- MySQL on `127.0.0.1:33306`
+- Redis on `127.0.0.1:6379`
+- RabbitMQ on `127.0.0.1:5672`
+- RabbitMQ Management UI on `http://127.0.0.1:15672`
+
+### 2. Prepare Python environment
+
+```bash
+uv venv
+source .venv/bin/activate
+uv pip install -r requirements.txt
+cp .env.example .env
+python scripts/resource/init_db.py
+```
+
+### 3. Start backend services
+
+```bash
+uvicorn services.admin_service.main:app --host 0.0.0.0 --port 8001 --reload
+uvicorn services.api_service.main:app --host 0.0.0.0 --port 8002 --reload
+```
+
+### 4. Start frontend
+
+```bash
+cd frontend
+pnpm install
+pnpm dev --port 3001
+```
+
+### 5. Default admin access
+
+- Admin login: `http://127.0.0.1:3001/admin`
+- Username: `admin`
+- Password: `123456789`
+
+<br>
+
+## Flowise MCP Integration
+
+This fork supports two MCP publishing models:
+
+- `MCP (OpenAPI)`: existing OpenAPI-to-MCP conversion flow
+- `MCP (Flowise)`: publish a Flowise chatflow as an MCP service with the `predict` tool
+
+For Flowise integration:
+
+- Published services expose both SSE and Streamable HTTP MCP endpoints.
+- When Flowise runs in Docker, use `host.docker.internal` instead of `127.0.0.1` for local MCP URLs.
+- In Flowise `Custom MCP`, use a single server config in the form `{ "url": "http://host.docker.internal:8002/mcp/<service-id>/streamable-http?authkey=..." }`.
+
+<br>
+
 
 ## 🖥️ System Requirements
 

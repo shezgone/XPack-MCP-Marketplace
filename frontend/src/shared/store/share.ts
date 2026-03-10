@@ -6,11 +6,18 @@ import {
   createJSONStorage,
   devtools,
   persist,
+  StateStorage,
   subscribeWithSelector,
 } from "zustand/middleware";
 import { StateCreator } from "zustand";
 import { getDefaultLanguage } from "@/shared/utils/i18n";
 const _StorageKey = "XPack_Shared";
+
+const noopStorage: StateStorage = {
+  getItem: () => null,
+  setItem: () => {},
+  removeItem: () => {},
+};
 
 export interface GlobalPreference {
   /**
@@ -80,10 +87,18 @@ interface SharedStore {
   config: GlobalConfig;
   setConfig: (config: GlobalConfig) => void;
 }
+
+const getStoredState = () => {
+  if (typeof window === "undefined") {
+    return {};
+  }
+
+  const storage = createJSONStorage(() => localStorage);
+  return ((storage?.getItem(_StorageKey) as any)?.state || {}) as Partial<SharedStore>;
+};
+
 const fn: StateCreator<SharedStore, []> = (set) => {
-  const storage =
-    (createJSONStorage(() => localStorage)?.getItem(_StorageKey) as any)
-      ?.state || {};
+  const storage = getStoredState();
   return {
     config: storage.config || {
       hover_recommend: false,
@@ -113,8 +128,10 @@ const fn: StateCreator<SharedStore, []> = (set) => {
     },
     getPreferenceByKey: (key?: string) => {
       const preference =
-        JSON.parse(window.localStorage.getItem("preference") || "{}") ||
-        useSharedStore?.getState?.()?.preference;
+        typeof window === "undefined"
+          ? useSharedStore?.getState?.()?.preference || {}
+          : JSON.parse(window.localStorage.getItem("preference") || "{}") ||
+            useSharedStore?.getState?.()?.preference;
       return key ? preference[key] : preference;
     },
     user: storage.user || null,
@@ -152,7 +169,9 @@ const fn: StateCreator<SharedStore, []> = (set) => {
 export const useSharedStore = createWithEqualityFn<SharedStore>()(
   persist(subscribeWithSelector(devtools(fn)), {
     name: _StorageKey,
-    storage: createJSONStorage(() => localStorage),
+    storage: createJSONStorage(() =>
+      typeof window === "undefined" ? noopStorage : localStorage
+    ),
   }),
   shallow
 );

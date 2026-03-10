@@ -17,9 +17,17 @@ import { Search } from "lucide-react";
 
 type ViewMode = "list" | "edit" | "create";
 
-export const MCPServicesManagement: React.FC = () => {
+interface MCPServicesManagementProps {
+  serviceType?: "openapi" | "flowise";
+}
+
+export const MCPServicesManagement: React.FC<MCPServicesManagementProps> = ({
+  serviceType = "openapi",
+}) => {
   const { t } = useTranslation();
   const searchParams = useSearchParams();
+  const tabKey = serviceType === "flowise" ? "mcp-flowise" : "mcp-services";
+  const isFlowise = serviceType === "flowise";
 
   const {
     services,
@@ -34,7 +42,7 @@ export const MCPServicesManagement: React.FC = () => {
     loadServices,
     setSearchTerm,
     setStatusFilter,
-  } = useMCPServicesList();
+  } = useMCPServicesList(serviceType);
   const [addServiceType, setAddServiceType] = useState<string | null>(null);
 
   // 搜索相关状态
@@ -75,7 +83,7 @@ export const MCPServicesManagement: React.FC = () => {
       const params = new URLSearchParams(searchParams);
 
       // Always keep the tab parameter
-      params.set("tab", "mcp-services");
+      params.set("tab", tabKey);
 
       if (mode === "list") {
         params.delete("mode");
@@ -91,7 +99,7 @@ export const MCPServicesManagement: React.FC = () => {
 
       window.history.pushState({}, "", `/admin/console?${params.toString()}`);
     },
-    [searchParams]
+    [searchParams, tabKey]
   );
 
   // Sync state with URL on mount and URL changes
@@ -112,6 +120,12 @@ export const MCPServicesManagement: React.FC = () => {
 
   // Server CRUD operations
   const handleCreateService = (type: string) => {
+    if (type === "flowise") {
+      setViewMode("create");
+      setSelectedServiceId(null);
+      updateURL("create");
+      return;
+    }
     setAddServiceType(type);
     setIsOpenAPIModalOpen(true);
   };
@@ -232,6 +246,7 @@ export const MCPServicesManagement: React.FC = () => {
     return (
       <ServiceEditPage
         serviceId={selectedServiceId || undefined}
+        serviceType={serviceType}
         onSave={handleSaveService}
         onCancel={handleCancelEdit}
         loading={loading}
@@ -247,13 +262,18 @@ export const MCPServicesManagement: React.FC = () => {
     <DashboardDemoContent
       title={t("MCP")}
       description={t(
-        "Manage your MCP servers, configure APIs, and monitor server status"
+        isFlowise
+          ? "Register Flowise chatflows as MCP-accessible services"
+          : "Manage your MCP servers, configure APIs, and monitor server status"
       )}
     >
       <div className="space-y-6 w-full">
         {/* Filters and Actions */}
         <div className="flex justify-between items-center gap-4">
-          <ServiceFiltersBar onAddService={handleCreateService} />
+          <ServiceFiltersBar
+            onAddService={handleCreateService}
+            serviceType={serviceType}
+          />
           
           {/* 搜索框 - 右侧 */}
           <Input
@@ -286,7 +306,7 @@ export const MCPServicesManagement: React.FC = () => {
         />
 
         {/* Modals */}
-        {isOpenAPIModalOpen && (
+        {!isFlowise && isOpenAPIModalOpen && (
           <OpenAPIGeneratorModal
             isOpen={true}
             onClose={handleCloseOpenAPIModal}

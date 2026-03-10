@@ -6,6 +6,7 @@ import {
   createJSONStorage,
   devtools,
   persist,
+  StateStorage,
   subscribeWithSelector,
 } from "zustand/middleware";
 import { StateCreator } from "zustand";
@@ -14,6 +15,12 @@ import { fetchAdminAPI } from "@/rpc/admin-api";
 import { fetchAPI } from "@/shared/rpc/common-function";
 import { md5Encrypt } from "@/shared/utils/crypto";
 const _StorageKey = "XPack_Admin";
+
+const noopStorage: StateStorage = {
+  getItem: () => null,
+  setItem: () => {},
+  removeItem: () => {},
+};
 
 export type AdminStore = {
   // Admin token
@@ -30,10 +37,17 @@ export type AdminStore = {
   getAdminUser: (path?: string) => Promise<ApiResponse>;
 };
 
+const getStoredAdminState = () => {
+  if (typeof window === "undefined") {
+    return {};
+  }
+
+  const storage = createJSONStorage(() => localStorage);
+  return ((storage?.getItem(_StorageKey) as any)?.state || {}) as Partial<AdminStore>;
+};
+
 const fn: StateCreator<AdminStore, []> = (set, get) => {
-  const storage =
-    (createJSONStorage(() => localStorage)?.getItem(_StorageKey) as any)
-      ?.state || {};
+  const storage = getStoredAdminState();
   return {
     admin_token: storage.admin_token || null,
     setAdminToken: (admin_token: string | null) => {
@@ -130,7 +144,9 @@ const fn: StateCreator<AdminStore, []> = (set, get) => {
 export const useAdminStore = createWithEqualityFn<AdminStore>()(
   persist(subscribeWithSelector(devtools(fn, { name: "AdminStore" })), {
     name: _StorageKey,
-    storage: createJSONStorage(() => localStorage),
+    storage: createJSONStorage(() =>
+      typeof window === "undefined" ? noopStorage : localStorage
+    ),
   }),
   shallow
 );

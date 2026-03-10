@@ -1,6 +1,7 @@
 import { ApiArrayResponse, ApiObjectResponse } from "@/shared/types";
 import { fetchAdminAPI } from "@/rpc/admin-api";
 import {
+  CreateFlowiseServicePayload,
   MCPResourceGroupResponse,
   MCPService,
   MCPServiceFormData,
@@ -27,6 +28,7 @@ export interface GetMCPServiceListParams {
   page_size: number;
   search?: string;
   status?: string;
+  service_type?: string;
 }
 
 export interface GetMCPResourceGroupsParams {
@@ -65,6 +67,7 @@ export const getMCPServiceList = async (
     page_size: params.page_size.toString(),
     ...(params.search && { keyword: params.search }),
     ...(params.status && { filter_status: params.status }),
+    ...(params.service_type && { service_type: params.service_type }),
   });
 
   const response = await fetchAdminAPI<MCPService[]>(
@@ -116,6 +119,23 @@ export const saveMCPService = async (
     return false;
   }
   toast.success(i18n.t("Server updated successfully"));
+  return true;
+};
+
+export const createFlowiseService = async (
+  formData: CreateFlowiseServicePayload
+): Promise<boolean> => {
+  const response = await fetchAdminAPI("/api/mcp/service/flowise", {
+    method: "POST",
+    body: formData as unknown as BodyInit,
+  });
+  if (!response.success) {
+    toast.error(
+      response.error_message || i18n.t("Failed to create Flowise server")
+    );
+    return false;
+  }
+  toast.success(i18n.t("Flowise server created successfully"));
   return true;
 };
 

@@ -64,20 +64,21 @@ const BasicProductDetailThemeSelector: React.FC<
   }, [product.name]);
   useEffect(() => {
     if (user) {
+      setVisitor(false);
       if (user?.allow_all) {
-        setCanInvoke(true)
+        setCanInvoke(true);
       } else {
-        const serviceId = product.id
-        const allowIds = user.service_ids
+        const serviceId = product.id;
+        const allowIds = user.service_ids;
         if (!allowIds?.includes(serviceId)) {
-          setCanInvoke(false)
+          setCanInvoke(false);
         } else {
-          setCanInvoke(true)
+          setCanInvoke(true);
         }
       }
     } else {
-      setCanInvoke(true);
       setVisitor(true);
+      setCanInvoke(false);
     }
   }, [user, product.id]);
   const getCodeContent = () => {

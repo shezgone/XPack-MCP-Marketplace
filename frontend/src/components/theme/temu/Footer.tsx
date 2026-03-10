@@ -10,6 +10,9 @@ interface FooterProps {}
 export const Footer: React.FC<FooterProps> = ({}) => {
   const { platformConfig } = usePlatformConfig();
   const { t } = useTranslation();
+  const platformUrl =
+    platformConfig?.url ||
+    (platformConfig?.domain ? `https://${platformConfig.domain}` : undefined);
   return (
     <>
       {/* Temu Style Footer */}
@@ -47,17 +50,24 @@ export const Footer: React.FC<FooterProps> = ({}) => {
 
               {/* Powered By */}
               <div className="flex items-center gap-4">
-                <a
-                  href="https://xpack.ai"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 text-gray-600 hover:text-orange-500 transition-colors text-sm font-medium"
-                >
-                  <div className="flex items-center gap-2 bg-white px-3 py-1 rounded-full border border-gray-200 hover:border-orange-200 transition-all duration-200">
+                {platformUrl ? (
+                  <a
+                    href={platformUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 text-gray-600 hover:text-orange-500 transition-colors text-sm font-medium"
+                  >
+                    <div className="flex items-center gap-2 bg-white px-3 py-1 rounded-full border border-gray-200 hover:border-orange-200 transition-all duration-200">
+                      <Star className="w-4 h-4 text-orange-500" />
+                      <span>Powered by {platformConfig?.name}</span>
+                    </div>
+                  </a>
+                ) : (
+                  <div className="flex items-center gap-2 bg-white px-3 py-1 rounded-full border border-gray-200 text-gray-600 text-sm font-medium">
                     <Star className="w-4 h-4 text-orange-500" />
-                    <span>Powered By XPack.AI</span>
+                    <span>Powered by {platformConfig?.name}</span>
                   </div>
-                </a>
+                )}
               </div>
             </div>
           </div>

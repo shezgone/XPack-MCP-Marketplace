@@ -7,6 +7,9 @@ interface FooterProps {}
 
 export const Footer: React.FC<FooterProps> = ({}) => {
   const { platformConfig } = usePlatformConfig();
+  const platformUrl =
+    platformConfig?.url ||
+    (platformConfig?.domain ? `https://${platformConfig.domain}` : undefined);
   return (
     <>
       {/* Creative Footer */}
@@ -14,9 +17,13 @@ export const Footer: React.FC<FooterProps> = ({}) => {
         <span className="mr-1">
           © 2025 {platformConfig?.name}. All rights reserved.
         </span>
-        <a className="text-xs text-primary-500 hover:text-primary-600 transition-colors" href="https://xpack.ai">
-          Powered By XPack.AI
-        </a>
+        {platformUrl ? (
+          <a className="text-xs text-primary-500 hover:text-primary-600 transition-colors" href={platformUrl}>
+            Powered by {platformConfig?.name}
+          </a>
+        ) : (
+          <span className="text-xs text-primary-500">Powered by {platformConfig?.name}</span>
+        )}
       </footer>
     </>
   );

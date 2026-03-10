@@ -33,6 +33,20 @@ const _DefaultFormData: MCPServiceFormData = {
   enabled: 0,
   tags: [],
   apis: [],
+  service_type: "openapi",
+};
+
+const FLOWISE_TOOL_PATH_PREFIX = "/api/v1/prediction/";
+
+const buildFlowiseToolPath = (chatflowId: string) =>
+  `${FLOWISE_TOOL_PATH_PREFIX}${chatflowId.trim()}`;
+
+const extractFlowiseChatflowId = (service?: MCPServiceFormData | null) => {
+  const toolPath = service?.apis?.[0]?.path || service?.apis?.[0]?.url || "";
+  if (!toolPath.startsWith(FLOWISE_TOOL_PATH_PREFIX)) {
+    return "";
+  }
+  return toolPath.slice(FLOWISE_TOOL_PATH_PREFIX.length);
 };
 
 // Helper function to validate URL
@@ -59,8 +73,19 @@ const isValidDomain = (url: string) => {
   }
 };
 
+const isLocalUrl = (url: string) => {
+  if (!url) return false;
+  try {
+    const parsed = new URL(url);
+    return ["localhost", "127.0.0.1"].includes(parsed.hostname);
+  } catch {
+    return false;
+  }
+};
+
 const validateServiceForm = (data: MCPServiceFormData, t: any) => {
   const errors: Record<string, string> = {};
+  const isFlowise = data.service_type === "flowise";
 
   if (!data.slug_name?.trim()) {
     errors.slug_name = t("Server ID is required");
@@ -78,8 +103,12 @@ const validateServiceForm = (data: MCPServiceFormData, t: any) => {
     errors.base_url = t("API Endpoint is required");
   } else if (!isValidUrl(data.base_url)) {
     errors.base_url = t("API Endpoint must be a valid HTTP/HTTPS URL");
-  } else if (!isValidDomain(data.base_url)) {
+  } else if (!isValidDomain(data.base_url) && !(isFlowise && isLocalUrl(data.base_url))) {
     errors.base_url = t("API Endpoint must contain a valid domain name");
+  }
+
+  if (isFlowise && !data.flowise_chatflow_id?.trim()) {
+    errors.flowise_chatflow_id = t("Chatflow ID is required");
   }
 
   if (!data.short_description?.trim()) {
@@ -91,6 +120,7 @@ const validateServiceForm = (data: MCPServiceFormData, t: any) => {
 
 interface ServiceEditPageProps {
   serviceId?: string;
+  serviceType?: "openapi" | "flowise";
   onSave: (data: MCPServiceFormData, isDraft?: boolean) => void;
   onCancel: () => void;
   loading?: boolean;
@@ -100,12 +130,14 @@ interface ServiceEditPageProps {
 
 const BaseServiceEditPage: React.FC<ServiceEditPageProps> = ({
   serviceId,
+  serviceType = "openapi",
   onSave,
   onCancel,
   loading = false,
 }) => {
   const { t } = useTranslation();
   const isEditing = !!serviceId;
+  const isFlowiseMode = serviceType === "flowise";
 
   // use detail hook to get service detail
   const {
@@ -123,7 +155,21 @@ const BaseServiceEditPage: React.FC<ServiceEditPageProps> = ({
   const [isDraft, setIsDraft] = useState(false);
 
   const [formData, setFormData] =
-    useState<MCPServiceFormData>(_DefaultFormData);
+    useState<MCPServiceFormData>({
+      ..._DefaultFormData,
+      service_type: serviceType,
+      apis: isFlowiseMode
+        ? [
+            {
+              id: "flowise-predict",
+              name: "predict",
+              description: "Run the configured Flowise chatflow",
+              path: FLOWISE_TOOL_PATH_PREFIX,
+              url: FLOWISE_TOOL_PATH_PREFIX,
+            },
+          ]
+        : [],
+    });
   const [newTag, setNewTag] = useState("");
 
   // OpenAPI modal state
@@ -144,17 +190,41 @@ const BaseServiceEditPage: React.FC<ServiceEditPageProps> = ({
   // when service data loaded, fill form
   useEffect(() => {
     if (!serviceId || !service) return;
-    setFormData({
-      ...formData,
+    setFormData((prev) => ({
+      ...prev,
       ...service,
-    });
+      flowise_chatflow_id:
+        service.service_type === "flowise"
+          ? extractFlowiseChatflowId(service)
+          : service.flowise_chatflow_id,
+    }));
   }, [service, serviceId]);
 
   const handleInputChange = (field: keyof MCPServiceFormData, value: any) => {
-    setFormData((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
+    setFormData((prev) => {
+      const next = {
+        ...prev,
+        [field]: value,
+      };
+
+      if (field === "flowise_chatflow_id") {
+        const path = buildFlowiseToolPath(value || "");
+        next.apis = [
+          {
+            ...(prev.apis?.[0] || {}),
+            id: prev.apis?.[0]?.id || "flowise-predict",
+            name: prev.apis?.[0]?.name || "predict",
+            description:
+              prev.apis?.[0]?.description ||
+              "Run the configured Flowise chatflow",
+            path,
+            url: path,
+          },
+        ];
+      }
+
+      return next;
+    });
   };
 
   const handleAddTag = () => {
@@ -297,12 +367,16 @@ const BaseServiceEditPage: React.FC<ServiceEditPageProps> = ({
             <ChevronLeftIcon className="w-5 h-5" />
           </Button>
           <h1 className="text-2xl font-bold">
-            {isEditing ? t("Server Detail") : t("Create New Server")}
+            {isEditing
+              ? t("Server Detail")
+              : isFlowiseMode
+                ? t("Create Flowise Server")
+                : t("Create New Server")}
           </h1>
         </div>
         <div className="flex items-center gap-2">
           {/* only show OpenAPI update button in edit mode */}
-          {isEditing && (
+          {isEditing && !isFlowiseMode && (
             <Button
               onPress={handleOpenAPIUpdate}
               isDisabled={loading || dataLoading || updateLoading}
@@ -375,6 +449,7 @@ const BaseServiceEditPage: React.FC<ServiceEditPageProps> = ({
                   onAddTag={handleAddTag}
                   onRemoveTag={handleRemoveTag}
                   errors={validationErrors}
+                  serviceType={serviceType}
                 />
               </div>
               <div className="w-[400px] max-w-[1/2]">
@@ -388,7 +463,11 @@ const BaseServiceEditPage: React.FC<ServiceEditPageProps> = ({
 
           <Tab key="tools" title={t("Tools Management")}>
             <div className="pt-2">
-              <ToolsTab formData={formData} onInputChange={handleInputChange} />
+              <ToolsTab
+                formData={formData}
+                onInputChange={handleInputChange}
+                hideUrl={isFlowiseMode}
+              />
             </div>
           </Tab>
 
@@ -414,7 +493,7 @@ const BaseServiceEditPage: React.FC<ServiceEditPageProps> = ({
       )}
 
       {/* OpenAPI Generator Modal */}
-      {isOpenAPIModalOpen && (
+      {!isFlowiseMode && isOpenAPIModalOpen && (
         <OpenAPIGeneratorModal
           isOpen={true}
           onClose={handleCloseOpenAPIModal}

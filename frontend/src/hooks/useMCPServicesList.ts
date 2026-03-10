@@ -9,6 +9,7 @@ import {
   ServiceStats,
 } from "@/shared/types/mcp-service";
 import {
+  createFlowiseService,
   getMCPServiceList,
   saveMCPService,
   deleteMCPService,
@@ -16,7 +17,7 @@ import {
   parseOpenAPIDocument as parseOpenAPIDocumentAPI,
 } from "@/services/mcpService";
 
-export const useMCPServicesList = () => {
+export const useMCPServicesList = (serviceType?: string) => {
   const [services, setServices] = useState<MCPService[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -48,6 +49,7 @@ export const useMCPServicesList = () => {
           page_size: pagination.pageSize,
           search: currentSearch || undefined,
           status: currentStatus === "all" ? undefined : currentStatus,
+          service_type: serviceType,
         });
 
         if (response.success && response.data) {
@@ -154,7 +156,37 @@ export const useMCPServicesList = () => {
       setError(null);
 
       try {
-        const result = await saveMCPService(data);
+        const normalizeOptionalNumber = (value?: string) => {
+          if (value === undefined || value === null || value === "") {
+            return undefined;
+          }
+
+          const parsed = Number(value);
+          return Number.isNaN(parsed) ? undefined : parsed;
+        };
+
+        const result =
+          data.service_type === "flowise"
+            ? await createFlowiseService({
+                name: data.name,
+                slug_name: data.slug_name || "",
+                short_description: data.short_description,
+                long_description: data.long_description || undefined,
+                base_url: data.base_url,
+                flowise_chatflow_id: data.flowise_chatflow_id || "",
+                headers: data.headers,
+                charge_type: data.charge_type,
+                price: normalizeOptionalNumber(data.price),
+                input_token_price: normalizeOptionalNumber(
+                  data.input_token_price
+                ),
+                output_token_price: normalizeOptionalNumber(
+                  data.output_token_price
+                ),
+                enabled: data.enabled,
+                tags: data.tags?.filter(Boolean),
+              })
+            : await saveMCPService(data);
 
         if (result) await loadServices(1, searchTerm, statusFilter);
         return result;
@@ -167,7 +199,7 @@ export const useMCPServicesList = () => {
         setLoading(false);
       }
     },
-    [loadServices, searchTerm, statusFilter]
+    [loadServices, searchTerm, serviceType, statusFilter]
   );
 
   // update server
