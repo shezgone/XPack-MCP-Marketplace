@@ -51,6 +51,7 @@ export interface MCPServiceAPIItem {
   id: string;
   name: string;
   description?: string;
+  long_description?: string;
   url?: string;
   path?: string;
 }
@@ -89,6 +90,9 @@ export interface CreateFlowiseServicePayload {
   long_description?: string;
   base_url: string;
   flowise_chatflow_id: string;
+  tool_name: string;
+  tool_description: string;
+  tool_long_description?: string;
   headers?: MCPAuthHeaderItem[];
   charge_type: ChargeType;
   price?: number;

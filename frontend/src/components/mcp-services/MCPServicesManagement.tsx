@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useCallback, useEffect, useRef } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useMCPServicesList } from "@/hooks/useMCPServicesList";
 import { MCPService, MCPServiceFormData } from "@/shared/types/mcp-service";
 import { useTranslation } from "@/shared/lib/useTranslation";
@@ -25,6 +25,7 @@ export const MCPServicesManagement: React.FC<MCPServicesManagementProps> = ({
   serviceType = "openapi",
 }) => {
   const { t } = useTranslation();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const tabKey = serviceType === "flowise" ? "mcp-flowise" : "mcp-services";
   const isFlowise = serviceType === "flowise";
@@ -97,9 +98,9 @@ export const MCPServicesManagement: React.FC<MCPServicesManagementProps> = ({
         }
       }
 
-      window.history.pushState({}, "", `/admin/console?${params.toString()}`);
+      router.replace(`/admin/console?${params.toString()}`, { scroll: false });
     },
-    [searchParams, tabKey]
+    [router, searchParams, tabKey]
   );
 
   // Sync state with URL on mount and URL changes

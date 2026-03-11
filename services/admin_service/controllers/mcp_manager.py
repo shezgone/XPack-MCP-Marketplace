@@ -35,6 +35,9 @@ class FlowiseServiceRequest(BaseModel):
     long_description: Optional[str] = None
     base_url: str
     flowise_chatflow_id: str
+    tool_name: str
+    tool_description: str
+    tool_long_description: Optional[str] = None
     headers: Optional[list] = None
     charge_type: Optional[str] = ChargeType.FREE.value
     price: Optional[float] = 0
@@ -128,6 +131,8 @@ def create_flowise_service(request: Request, body: FlowiseServiceRequest, mcp_ma
         ValidationUtils.require_non_empty_string(body.slug_name, "slug_name")
         ValidationUtils.require_non_empty_string(body.short_description, "short_description")
         ValidationUtils.require_non_empty_string(body.flowise_chatflow_id, "flowise_chatflow_id")
+        ValidationUtils.require_non_empty_string(body.tool_name, "tool_name")
+        ValidationUtils.require_non_empty_string(body.tool_description, "tool_description")
         ValidationUtils.validate_url(body.base_url, "base_url")
         service_id = mcp_manager_service.create_flowise_service(body.model_dump())
         return ResponseUtils.success(data={"service_id": service_id})

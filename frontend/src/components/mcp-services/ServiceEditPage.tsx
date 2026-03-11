@@ -36,6 +36,12 @@ const _DefaultFormData: MCPServiceFormData = {
   service_type: "openapi",
 };
 
+const DEFAULT_FLOWISE_TOOL_NAME = "domain_function_tool";
+const DEFAULT_FLOWISE_TOOL_DESCRIPTION =
+  "Summarize what this MCP does in one sentence.";
+const DEFAULT_FLOWISE_TOOL_LONG_DESCRIPTION =
+  "Describe when this tool should be used, what business domain it covers, and what kind of answers it should return.";
+
 const FLOWISE_TOOL_PATH_PREFIX = "/api/v1/prediction/";
 
 const buildFlowiseToolPath = (chatflowId: string) =>
@@ -111,6 +117,14 @@ const validateServiceForm = (data: MCPServiceFormData, t: any) => {
     errors.flowise_chatflow_id = t("Chatflow ID is required");
   }
 
+  if (isFlowise && !data.apis?.[0]?.name?.trim()) {
+    errors.tool_name = t("Tool name is required");
+  }
+
+  if (isFlowise && !data.apis?.[0]?.description?.trim()) {
+    errors.tool_description = t("Short tool description is required");
+  }
+
   if (!data.short_description?.trim()) {
     errors.short_description = t("Short description is required");
   }
@@ -162,8 +176,9 @@ const BaseServiceEditPage: React.FC<ServiceEditPageProps> = ({
         ? [
             {
               id: "flowise-predict",
-              name: "predict",
-              description: "Run the configured Flowise chatflow",
+              name: DEFAULT_FLOWISE_TOOL_NAME,
+              description: DEFAULT_FLOWISE_TOOL_DESCRIPTION,
+              long_description: DEFAULT_FLOWISE_TOOL_LONG_DESCRIPTION,
               path: FLOWISE_TOOL_PATH_PREFIX,
               url: FLOWISE_TOOL_PATH_PREFIX,
             },
@@ -213,10 +228,13 @@ const BaseServiceEditPage: React.FC<ServiceEditPageProps> = ({
           {
             ...(prev.apis?.[0] || {}),
             id: prev.apis?.[0]?.id || "flowise-predict",
-            name: prev.apis?.[0]?.name || "predict",
+            name: prev.apis?.[0]?.name || DEFAULT_FLOWISE_TOOL_NAME,
             description:
               prev.apis?.[0]?.description ||
-              "Run the configured Flowise chatflow",
+              DEFAULT_FLOWISE_TOOL_DESCRIPTION,
+            long_description:
+              prev.apis?.[0]?.long_description ||
+              DEFAULT_FLOWISE_TOOL_LONG_DESCRIPTION,
             path,
             url: path,
           },
@@ -467,6 +485,8 @@ const BaseServiceEditPage: React.FC<ServiceEditPageProps> = ({
                 formData={formData}
                 onInputChange={handleInputChange}
                 hideUrl={isFlowiseMode}
+                serviceType={serviceType}
+                errors={validationErrors}
               />
             </div>
           </Tab>

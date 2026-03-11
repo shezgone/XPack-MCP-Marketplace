@@ -1,9 +1,13 @@
 "use client";
 
 import React, { useEffect, useState, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslation } from "@/shared/lib/useTranslation";
-import { useAdminStore } from "@/store/admin";
+import {
+  getPersistedAdminToken,
+  initializeAdminStore,
+  useAdminStore,
+} from "@/store/admin";
 import DashboardDemoContent from "@/shared/components/DashboardDemoContent";
 import { SidebarItem, TabKey } from "@/shared/types/dashboard";
 import { useAdminLogin } from "@/hooks/useAdminLogin";
@@ -27,11 +31,14 @@ import ResourceGroupManagement from "../resource-group/resourceGroup";
 
 const ConsoleContent: React.FC = () => {
   const { t } = useTranslation();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const [admin_token, getAdminUser] = useAdminStore((state) => [
     state.admin_token,
     state.getAdminUser,
   ]);
+  const [isAdminStoreReady, setIsAdminStoreReady] = useState(false);
+  const effectiveAdminToken = admin_token || getPersistedAdminToken();
 
   const getInitialTab = (): TabKey => {
     const tabFromUrl = searchParams.get("tab") as TabKey;
@@ -45,8 +52,7 @@ const ConsoleContent: React.FC = () => {
     }
     return TabKey.CONSOLE;
   };
-
-  const [activeTab, setActiveTab] = useState<TabKey>(getInitialTab);
+  const activeTab = getInitialTab();
   const isSkipOnboarding =
     typeof window !== "undefined" &&
     localStorage.getItem("admin_onboarding_skip") === "1";
@@ -95,27 +101,46 @@ const ConsoleContent: React.FC = () => {
     },
   ];
 
+  useEffect(() => {
+    initializeAdminStore();
+
+    if (!useAdminStore.persist) {
+      setIsAdminStoreReady(true);
+      return;
+    }
+
+    if (useAdminStore.persist.hasHydrated()) {
+      setIsAdminStoreReady(true);
+      return;
+    }
+
+    const unsubscribe = useAdminStore.persist.onFinishHydration(() => {
+      setIsAdminStoreReady(true);
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, []);
+
   // If admin is not logged in, redirect to admin login page
   useEffect(() => {
-    if (!admin_token) {
+    if (!isAdminStoreReady) {
+      return;
+    }
+    if (!effectiveAdminToken) {
       window.location.href =
         process.env.NEXT_PUBLIC_ADMIN_LOGIN_URL || "/admin";
     }
-  }, [admin_token]);
+  }, [effectiveAdminToken, isAdminStoreReady]);
 
   const handleTabNavigate = (tab: TabKey | string, _subTab?: string) => {
-    setActiveTab(tab as TabKey);
-
-    // update url params
     if (tab === TabKey.CONSOLE) {
-      // when switch to dashboard, clear all query params, only keep base path
-      window.history.pushState({}, "", "/admin/console");
+      router.replace("/admin/console", { scroll: false });
     } else {
-      // other tabs set corresponding tab params
       const params = new URLSearchParams();
       params.set("tab", tab);
-
-      window.history.pushState({}, "", `/admin/console?${params.toString()}`);
+      router.replace(`/admin/console?${params.toString()}`, { scroll: false });
     }
   };
 
@@ -156,12 +181,16 @@ const ConsoleContent: React.FC = () => {
   //todo: onboarding
   // Initialize onboarding state from localStorage
   useEffect(() => {
+    if (activeTab !== TabKey.CONSOLE) {
+      setShowOnboarding(false);
+      return;
+    }
     if (isSkipOnboarding) {
       setShowOnboarding(false);
       return;
     }
     initOnboarding();
-  }, []);
+  }, [activeTab]);
 
   const handleSkipOnboarding = () => {
     localStorage.setItem("admin_onboarding_skip", "1");
@@ -191,13 +220,15 @@ const ConsoleContent: React.FC = () => {
         await markTaskAsCompleted(taskKey);
         break;
       case OnboardingTaskKey.MCP_SERVICES:
+        setShowOnboarding(false);
         handleTabNavigate(TabKey.MCP_SERVICES);
-        await markTaskAsCompleted(taskKey);
+        void markTaskAsCompleted(taskKey);
         break;
       case OnboardingTaskKey.REVENUE_MANAGEMENT:
+        setShowOnboarding(false);
         setSettingModalKeyword("Payment");
         setIsSettingsModalOpen(true);
-        await markTaskAsCompleted(taskKey);
+        void markTaskAsCompleted(taskKey);
         break;
       case OnboardingTaskKey.SHARE_PLATFORM:
         setIsShareModalOpen(true);
@@ -218,9 +249,9 @@ const ConsoleContent: React.FC = () => {
   const renderContent = () => {
     switch (activeTab) {
       case TabKey.MCP_SERVICES:
-        return <MCPServicesManagement serviceType="openapi" />;
+        return <MCPServicesManagement key={TabKey.MCP_SERVICES} serviceType="openapi" />;
       case TabKey.MCP_FLOWISE:
-        return <MCPServicesManagement serviceType="flowise" />;
+        return <MCPServicesManagement key={TabKey.MCP_FLOWISE} serviceType="flowise" />;
       case TabKey.USER_MANAGEMENT:
         return (
           <div className="h-full overflow-auto">

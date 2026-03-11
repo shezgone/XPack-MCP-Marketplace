@@ -1,13 +1,11 @@
-import { useAdminStore } from "@/store/admin";
+import { getPersistedAdminToken, useAdminStore } from "@/store/admin";
 import { ApiResponse } from "@/shared/types";
 import { getApiUrl } from "@/shared/rpc/adapter";
 
 const getAdminAuth = () => {
   return (
     useAdminStore?.getState?.()?.admin_token ||
-    (typeof window !== "undefined"
-      ? window.localStorage.getItem("admin_token")
-      : "")
+    getPersistedAdminToken()
   );
 };
 

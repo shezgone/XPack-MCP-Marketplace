@@ -122,6 +122,7 @@ class McpService:
         try:
             # Build input schema
             input_schema = self._build_input_schema(tool_api)
+            tool_description = self._build_tool_description(tool_api)
             
             # If no schema was built (no parameters), create a minimal schema
             if input_schema is None:
@@ -133,7 +134,7 @@ class McpService:
             
             t =  types.Tool(
                 name=tool_api.name,
-                description=tool_api.description,
+                description=tool_description,
                 inputSchema=input_schema,
             )
             output_schema = self._build_output_schema(tool_api)
@@ -143,6 +144,16 @@ class McpService:
         except Exception as e:
             self.logger.error(f"Tool conversion failed for {tool_api.name}: {e}")
             return None
+
+    def _build_tool_description(self, tool_api: McpToolApi) -> str:
+        short_description = (tool_api.description or "").strip()
+        long_description = (getattr(tool_api, "operation_examples", "") or "").strip()
+
+        if short_description and long_description:
+            return f"{short_description}\n\nUsage guidance: {long_description}"
+        if long_description:
+            return long_description
+        return short_description
 
     def _build_input_schema(self, tool_api: McpToolApi) -> dict:
         """

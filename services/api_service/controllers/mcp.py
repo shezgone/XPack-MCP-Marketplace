@@ -12,6 +12,7 @@ import asyncio
 import time
 import hashlib
 import re
+import json
 from mcp.server.sse import SseServerTransport
 from mcp.server.streamable_http import StreamableHTTPServerTransport
 from mcp.server.lowlevel import Server
@@ -263,12 +264,14 @@ class McpController:
         """
 
         async def asgi(scope, receive, send):
-            req = Request(scope)
+            req = Request(scope, receive)
             x_real_ip = req.headers.get("x-real-ip") or req.headers.get("x-forwarded-for")
             client_ip = (x_real_ip.split(",")[0].strip() if x_real_ip else (req.client.host if req.client else "unknown"))
             user_agent = req.headers.get("user-agent", "unknown")
             service_id = None
             session_key = None
+            request_body = b""
+            request_payload = None
 
             try:
                 # Extract service_id from URL path (supports both ID and slug_name)
@@ -350,6 +353,8 @@ class McpController:
                         })
                         await send({'type': 'http.response.body', 'body': response_body})
                         return
+                    request_body = await req.body()
+                    request_payload = self._parse_jsonrpc_payload(request_body)
 
                 # Extract user ID (for billing) - must provide valid apikey
                 user_info = self._extract_user_info(req)
@@ -389,6 +394,17 @@ class McpController:
                 connection_key = f"{service_id}:{user_id}:{client_ip}"
 
                 try:
+                    if req.method == "POST" and request_payload:
+                        if await self._handle_streamable_http_compat_request(
+                            send=send,
+                            request_payload=request_payload,
+                            service_id=service_id,
+                            user_id=user_id,
+                            apikey_id=apikey_id,
+                        ):
+                            self._note_session_activity(session_key)
+                            return
+
                     # Get or create a persistent StreamableHTTP transport and MCP server
                     transport = await self._ensure_http_session(session_key, service_id, user_id, apikey_id)
                     logger.debug(f"method: {req.method}, content_type: {content_type}")
@@ -420,7 +436,8 @@ class McpController:
                         connection_manager.update_activity(connection_key)
 
                     # Delegate request to transport; GET establishes SSE; POST sends JSON-RPC; DELETE terminates the session
-                    await transport.handle_request(scope, receive, send)
+                    receive_fn = self._build_buffered_receive(request_body) if req.method == "POST" else receive
+                    await transport.handle_request(scope, receive_fn, send)
 
                     # Update activity after handling (avoid cleaning long-running processing)
                     self._note_session_activity(session_key)
@@ -468,6 +485,99 @@ class McpController:
                 await send({'type': 'http.response.body', 'body': response_body})
 
         return asgi
+
+    def _parse_jsonrpc_payload(self, request_body: bytes) -> Optional[dict]:
+        if not request_body:
+            return None
+        try:
+            payload = json.loads(request_body.decode("utf-8"))
+            return payload if isinstance(payload, dict) else None
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            return None
+
+    def _build_buffered_receive(self, request_body: bytes):
+        consumed = False
+
+        async def receive():
+            nonlocal consumed
+            if consumed:
+                return {"type": "http.disconnect"}
+            consumed = True
+            return {
+                "type": "http.request",
+                "body": request_body,
+                "more_body": False,
+            }
+
+        return receive
+
+    async def _handle_streamable_http_compat_request(
+        self,
+        send,
+        request_payload: dict,
+        service_id: str,
+        user_id: str,
+        apikey_id: str,
+    ) -> bool:
+        method = request_payload.get("method")
+        request_id = request_payload.get("id")
+
+        if method == "tools/list":
+            tools = await self.server_factory._handle_list_tools(service_id)
+            result = {
+                "tools": [self._serialize_mcp_model(tool) for tool in tools],
+            }
+            await self._send_streamable_http_jsonrpc(send, request_id, {"jsonrpc": "2.0", "id": request_id, "result": result})
+            return True
+
+        if method == "tools/call":
+            params = request_payload.get("params") or {}
+            tool_name = params.get("name")
+            arguments = params.get("arguments") or {}
+            if not tool_name:
+                await self._send_streamable_http_jsonrpc(
+                    send,
+                    request_id,
+                    {"jsonrpc": "2.0", "id": request_id, "error": {"code": -32602, "message": "Tool name is required", "data": ""}},
+                )
+                return True
+
+            content, metadata = await self.server_factory._handle_call_tool_with_billing(
+                service_id,
+                tool_name,
+                arguments,
+                user_id,
+                apikey_id,
+            )
+            result = {
+                "content": [self._serialize_mcp_model(item) for item in content],
+            }
+            if metadata:
+                result.update(metadata)
+            await self._send_streamable_http_jsonrpc(send, request_id, {"jsonrpc": "2.0", "id": request_id, "result": result})
+            return True
+
+        return False
+
+    def _serialize_mcp_model(self, value):
+        if hasattr(value, "model_dump"):
+            return value.model_dump(by_alias=True, exclude_none=True)
+        return value
+
+    async def _send_streamable_http_jsonrpc(self, send, request_id, payload: dict) -> None:
+        body = f"id: {request_id}:0\nevent: message\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n".encode("utf-8")
+        await send({
+            "type": "http.response.start",
+            "status": 200,
+            "headers": [
+                [b"content-type", b"text/event-stream"],
+                [b"cache-control", b"no-cache, no-transform"],
+                [b"connection", b"keep-alive"],
+                [b"x-accel-buffering", b"no"],
+                [b"content-length", str(len(body)).encode("utf-8")],
+            ],
+        })
+        await send({"type": "http.response.body", "body": body})
 
     async def _wait_transport_ready(self, transport: StreamableHTTPServerTransport, timeout_seconds: float = 2.0) -> None:
         """Wait until StreamableHTTP transport is connected and streams are initialized.

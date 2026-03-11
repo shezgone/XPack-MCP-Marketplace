@@ -70,6 +70,12 @@ def normalize_slug_name(text: str) -> str:
     return normalized
 
 
+def normalize_service_type(service_type: Optional[str]) -> str:
+    if service_type == "flowise1":
+        return "flowise"
+    return service_type or "openapi"
+
+
 class McpManagerService:
     def __init__(self, db: Session):
         self.db = db
@@ -248,7 +254,7 @@ class McpManagerService:
                 # If provided as string, store directly
                 existing_service.tags = body["tags"]
         if "service_type" in body and body["service_type"] is not None:
-            existing_service.service_type = body["service_type"]
+            existing_service.service_type = normalize_service_type(body["service_type"])
         if not existing_service.service_type:
             existing_service.service_type = "openapi"
         # Commit changes
@@ -325,14 +331,14 @@ class McpManagerService:
             "long_description": service.long_description,
             "base_url": service.base_url,
             "headers":json.loads(service.headers) if service.headers else [],
-            "service_type": service.service_type,
+            "service_type": normalize_service_type(service.service_type),
             "charge_type": service.charge_type.value if service.charge_type else None,
             "price": str(float(service.price)) if service.price and service.charge_type == ChargeType.PER_CALL else "0.00",
             "input_token_price": str(float(service.input_token_price)) if service.input_token_price and service.charge_type == ChargeType.PER_TOKEN else "0.00",
             "output_token_price": str(float(service.output_token_price)) if service.output_token_price and service.charge_type == ChargeType.PER_TOKEN else "0.00",
             "enabled": service.enabled,
             "tags": parse_tags_to_array(service.tags),
-            "apis": [{"id": api.id, "name": api.name, "description": api.description,"url":api.path, "path": api.path} for api in apis],
+            "apis": [{"id": api.id, "name": api.name, "description": api.description, "long_description": api.operation_examples, "url":api.path, "path": api.path} for api in apis],
         }
 
         return service_info
@@ -353,6 +359,9 @@ class McpManagerService:
             long_description = body.get("long_description")
             base_url = body.get("base_url")
             chatflow_id = body.get("flowise_chatflow_id")
+            tool_name = body.get("tool_name") or "domain_function_tool"
+            tool_description = body.get("tool_description") or "Run the configured Flowise chatflow"
+            tool_long_description = body.get("tool_long_description")
             headers = body.get("headers") or []
             charge_type = body.get("charge_type") or ChargeType.FREE.value
             price = body.get("price") or 0.0
@@ -381,8 +390,8 @@ class McpManagerService:
             tool_api = McpToolApi()
             tool_api.id = str(uuid.uuid4())
             tool_api.service_id = service_id
-            tool_api.name = "predict"
-            tool_api.description = "Run the configured Flowise chatflow"
+            tool_api.name = tool_name
+            tool_api.description = tool_description
             tool_api.path = f"/api/v1/prediction/{chatflow_id}"
             tool_api.method = HttpMethod.POST
             tool_api.header_parameters = ""
@@ -399,7 +408,7 @@ class McpManagerService:
             tool_api.response_schema = json.dumps({"type": "object"})
             tool_api.response_examples = json.dumps({"text": "Flowise response"})
             tool_api.response_headers = ""
-            tool_api.operation_examples = ""
+            tool_api.operation_examples = tool_long_description or ""
             tool_api.enabled = 1
             tool_api.is_deleted = 0
             self.mcp_tool_api_repository.create(tool_api)

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   MCPService,
   MCPServiceFormData,
@@ -16,11 +16,15 @@ import {
   toggleMCPServiceStatus,
   parseOpenAPIDocument as parseOpenAPIDocumentAPI,
 } from "@/services/mcpService";
+import { getPersistedAdminToken, useAdminStore } from "@/store/admin";
 
 export const useMCPServicesList = (serviceType?: string) => {
   const [services, setServices] = useState<MCPService[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const adminToken = useAdminStore((state) => state.admin_token);
+  const effectiveAdminToken = adminToken || getPersistedAdminToken();
+  const initialRetryDoneRef = useRef(false);
 
   // pagination
   const [pagination, setPagination] = useState({
@@ -75,13 +79,36 @@ export const useMCPServicesList = (serviceType?: string) => {
         setLoading(false);
       }
     },
-    [pagination.pageSize] // only depend on pageSize, avoid circular dependency
+    [pagination.page, pagination.pageSize, searchTerm, serviceType, statusFilter]
   );
 
-  // load servers list when component mount
+  // Load servers once admin auth is available from either in-memory store or
+  // persisted storage. This avoids a first-click blank state from hydration lag.
   useEffect(() => {
+    if (!effectiveAdminToken) {
+      return;
+    }
     loadServices(1, searchTerm, statusFilter);
-  }, []); // only execute once when component mount
+  }, [effectiveAdminToken, loadServices, searchTerm, statusFilter, serviceType]);
+
+  useEffect(() => {
+    if (!effectiveAdminToken || loading || initialRetryDoneRef.current) {
+      return;
+    }
+
+    if (services.length > 0) {
+      return;
+    }
+
+    initialRetryDoneRef.current = true;
+    const retryTimer = window.setTimeout(() => {
+      loadServices(1, searchTerm, statusFilter);
+    }, 600);
+
+    return () => {
+      window.clearTimeout(retryTimer);
+    };
+  }, [effectiveAdminToken, error, loadServices, loading, searchTerm, serviceType, services.length, statusFilter]);
 
   // pagination
   const handlePageChange = useCallback(
@@ -174,6 +201,12 @@ export const useMCPServicesList = (serviceType?: string) => {
                 long_description: data.long_description || undefined,
                 base_url: data.base_url,
                 flowise_chatflow_id: data.flowise_chatflow_id || "",
+                tool_name: data.apis?.[0]?.name || "predict",
+                tool_description:
+                  data.apis?.[0]?.description ||
+                  "Run the configured Flowise chatflow",
+                tool_long_description:
+                  data.apis?.[0]?.long_description || undefined,
                 headers: data.headers,
                 charge_type: data.charge_type,
                 price: normalizeOptionalNumber(data.price),

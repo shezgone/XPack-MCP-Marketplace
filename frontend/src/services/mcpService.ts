@@ -110,9 +110,17 @@ export const getMCPServiceDetail = async (
 export const saveMCPService = async (
   formData: MCPServiceFormData
 ): Promise<boolean> => {
+  const normalizedFormData = {
+    ...formData,
+    apis: (formData.apis || []).map((api) => ({
+      ...api,
+      operation_examples: api.long_description,
+    })),
+  };
+
   const response = await fetchAdminAPI("/api/mcp/service", {
     method: "PUT",
-    body: formData as unknown as BodyInit,
+    body: normalizedFormData as unknown as BodyInit,
   });
   if (!response.success) {
     toast.error(response.error_message || i18n.t("Failed to update server"));

@@ -16,6 +16,24 @@ import { fetchAPI } from "@/shared/rpc/common-function";
 import { md5Encrypt } from "@/shared/utils/crypto";
 const _StorageKey = "XPack_Admin";
 
+export const getPersistedAdminToken = () => {
+  if (typeof window === "undefined") {
+    return "";
+  }
+
+  try {
+    const raw = window.localStorage.getItem(_StorageKey);
+    if (!raw) {
+      return "";
+    }
+
+    const parsed = JSON.parse(raw);
+    return parsed?.state?.admin_token || "";
+  } catch {
+    return "";
+  }
+};
+
 const noopStorage: StateStorage = {
   getItem: () => null,
   setItem: () => {},
